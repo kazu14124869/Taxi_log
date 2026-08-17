@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="タクシー管理">
+    <title>タクシー営業管理</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #27ae60;
+            --warning: #e67e22;
+            --bg: #f4f7f9;
+            --text: #333;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; color: var(--text); overflow-x: hidden; }
+        
+        /* 下部タブナビ */
+        .tab-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            display: flex; background: white; border-top: 1px solid #ddd; z-index: 1000;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .tab-item {
+            flex: 1; padding: 12px 0; text-align: center; font-weight: bold; color: #888; cursor: pointer; font-size: 0.8rem;
+        }
+        .tab-item.active { color: var(--accent); border-top: 3px solid var(--accent); background: #f9f9f9; }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 15px; padding-bottom: 100px; }
+        .page { display: none; animation: fadeIn 0.2s; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* カード */
+        .card { background: white; border-radius: 16px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; font-size: 1rem; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+
+        /* 月度サマリー表示 */
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .summary-item { background: #f8fafc; padding: 10px; border-radius: 10px; }
+        .summary-label { font-size: 0.7rem; color: #7f8c8d; }
+        .summary-val { font-size: 1rem; font-weight: bold; color: var(--primary); }
+        .summary-val.income { color: var(--success); }
+
+        /* カレンダー */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .calendar-header { text-align: center; font-size: 0.7rem; font-weight: bold; color: #999; padding-bottom: 5px; }
+        .day-cell { background: #fff; border: 1px solid #f0f0f0; min-height: 70px; border-radius: 8px; padding: 4px; cursor: pointer; }
+        .day-cell.active { background: #eef7ff; border-color: #d0e8ff; }
+        .day-num { font-size: 0.85rem; font-weight: bold; }
+        .day-data { font-size: 0.55rem; line-height: 1.1; margin-top: 2px; }
+        .day-income { color: var(--success); font-weight: bold; font-size: 0.6rem; }
+
+        /* 履歴リスト */
+        .history-card { border-left: 5px solid var(--accent); margin-bottom: 12px; }
+        .history-title { font-weight: bold; font-size: 1rem; margin-bottom: 8px; color: var(--primary); }
+        .history-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; text-align: center; }
+        .history-stat-box { background: #f9f9f9; padding: 8px; border-radius: 8px; }
+        .history-stat-label { font-size: 0.6rem; color: #888; display: block; }
+        .history-stat-val { font-size: 0.85rem; font-weight: bold; }
+
+        /* 計算機 */
+        .calc-result-box { background: var(--primary); color: white; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; }
+        .calc-result-val { font-size: 2.2rem; font-weight: bold; color: #f1c40f; display: block; }
+        .calc-row { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .calc-row label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #666; }
+        .calc-row input { padding: 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 1.1rem; }
+
+        /* 翌日トグルボタン */
+        .time-row { display: flex; gap: 10px; align-items: center; }
+        .time-row input[type="time"] { flex: 1; }
+        .next-day-toggle { display: none; }
+        .next-day-btn {
+            padding: 0 20px; height: 48px; display: flex; align-items: center; justify-content: center;
+            background: #eee; color: #888; border-radius: 10px; font-weight: bold;
+            cursor: pointer; transition: all 0.2s; border: 2px solid transparent;
+        }
+        .next-day-toggle:checked + .next-day-btn {
+            background: var(--warning); color: white; border-color: #d35400;
+        }
+
+        /* モーダル共通 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; }
+        .modal-content { background: white; margin: 5% auto; width: 92%; max-width: 450px; border-radius: 20px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .btn { border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; margin-top: 10px; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-outline { background: #eee; color: #666; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1rem; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- カレンダー表示ページ -->
+    <div id="pageCalendar" class="page active">
+        <div class="card">
+            <h3>月度選択
+                <div class="period-controls">
+                    <button class="icon-btn" style="background:#eee; border-radius:10px; width:40px; height:40px; border:none; cursor:pointer;" onclick="openPeriodModal(true)">✎</button>
+                    <button class="icon-btn" style="background:#eee; border-radius:10px; width:40px; height:40px; border:none; cursor:pointer;" onclick="openPeriodModal(false)">+</button>
+                </div>
+            </h3>
+            <select id="periodSelect" onchange="switchPeriod()"></select>
+            
+            <div class="summary-grid">
+                <div class="summary-item"><div class="summary-label">総営業収入</div><div id="sumTotal" class="summary-val income">¥0</div></div>
+                <div class="summary-item"><div class="summary-label">勤務回数</div><div id="sumWorkCount" class="summary-val">0回</div></div>
+                <div class="summary-item"><div class="summary-label">平均営業収入</div><div id="sumAvg" class="summary-val">¥0</div></div>
+                <div class="summary-item"><div class="summary-label">月判定</div><div id="sumMonthType" class="summary-val">-</div></div>
+            </div>
+            <div id="periodDates" style="font-size: 0.7rem; color: #999; margin-top: 10px; text-align: center;"></div>
+        </div>
+
+        <div class="card">
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+    </div>
+
+    <!-- 履歴一覧ページ -->
+    <div id="pageHistory" class="page">
+        <h2 style="margin: 0 0 15px 0; font-size: 1.2rem; color: var(--primary);">月度別履歴</h2>
+        <div id="historyList">
+            <!-- JSで生成 -->
+        </div>
+    </div>
+
+    <!-- 別枠計算機ページ -->
+    <div id="pageCalc" class="page">
+        <div class="calc-result-box">
+            <span style="font-size: 0.9rem; opacity: 0.8;">税抜収入 (保存なし)</span>
+            <span id="qResult" class="calc-result-val">¥0</span>
+        </div>
+        <div class="card">
+            <div class="calc-row"><label>税込売上</label><input type="number" id="qGross" placeholder="0" oninput="quickCalc()"></div>
+            <div class="calc-row"><label>迎車回数</label><input type="number" id="qPick" placeholder="0" oninput="quickCalc()"></div>
+            <div class="calc-row"><label>定額の差額</label><input type="number" id="qFixed" placeholder="0" oninput="quickCalc()"></div>
+            <div class="calc-row"><label>控除額</label><input type="number" id="qDed" placeholder="0" oninput="quickCalc()"></div>
+            <div class="calc-row"><label>事前確定の加算額</label><input type="number" id="qAdd" placeholder="0" oninput="quickCalc()"></div>
+            <button class="btn btn-outline" onclick="resetQuickCalc()">入力をリセット</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- 下部タブ -->
+<nav class="tab-nav">
+    <div class="tab-item active" id="tabCal" onclick="showPage('calendar')">カレンダー</div>
+    <div class="tab-item" id="tabHis" onclick="showPage('history')">履歴</div>
+    <div class="tab-item" id="tabCalc" onclick="showPage('calc')">計算機</div>
+</nav>
+
+<!-- 月度登録モーダル -->
+<div id="periodModal" class="modal">
+    <div class="modal-content">
+        <h3 id="periodModalTitle">月度の登録</h3>
+        <input type="hidden" id="editPeriodIdx" value="-1">
+        <div class="form-group"><label>開始日</label><input type="date" id="pStart"></div>
+        <div class="form-group"><label>終了日</label><input type="date" id="pEnd"></div>
+        <button class="btn btn-primary" onclick="savePeriod()">保存</button>
+        <button class="btn btn-outline" onclick="closeModal('periodModal')">閉じる</button>
+    </div>
+</div>
+
+<!-- 日付詳細・入力モーダル -->
+<div id="entryModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">詳細</h3>
+        <div id="viewMode">
+            <div id="viewDetails"></div>
+            <button class="btn btn-primary" onclick="toggleEditMode(true)">内容を訂正する</button>
+            <button class="btn btn-outline" onclick="closeModal('entryModal')">閉じる</button>
+        </div>
+        <div id="editMode" class="hidden">
+            <input type="hidden" id="editDate">
+            <div class="form-group"><label>勤務形態</label><select id="workType"><option value="日勤">日勤 (0.5回)</option><option value="B勤">B勤 (1.0回)</option><option value="GH勤">GH勤 (1.0回)</option></select></div>
+            <div class="form-group"><label>点呼時間</label><select id="startTime"><option>5:30</option><option>6:00</option><option>6:30</option><option>7:00</option><option>14:00</option><option>15:00</option></select></div>
+            
+            <div class="form-group">
+                <label>帰庫時間</label>
+                <div class="time-row">
+                    <input type="time" id="endTime">
+                    <input type="checkbox" id="isNextDay" class="next-day-toggle">
+                    <label for="isNextDay" class="next-day-btn">翌</label>
+                </div>
+            </div>
+
+            <div class="form-group"><label>休憩時間 (分)</label><input type="number" id="breakTime" value="60"></div>
+            <div class="form-group"><label>税込営業収入</label><input type="number" id="grossIncome" value="0"></div>
+            <div class="form-group"><label>定額の差額</label><input type="number" id="fixedDiff" value="0"></div>
+            <div class="form-group"><label>控除額</label><input type="number" id="deduction" value="0"></div>
+            <div class="form-group"><label>事前確定の加算額</label><input type="number" id="advanceAdd" value="0"></div>
+            <div class="form-group"><label>迎車回数</label><input type="number" id="pickupCount" value="0"></div>
+            <div class="form-group"><label>営業回数</label><input type="number" id="trips" value="0"></div>
+            
+            <button class="btn btn-success" onclick="saveData()">保存して反映</button>
+            <button class="btn btn-outline" onclick="toggleEditMode(false)">キャンセル</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let periods = JSON.parse(localStorage.getItem('taxi_p_v5') || '[]');
+    let dailyData = JSON.parse(localStorage.getItem('taxi_d_v5') || '{}');
+    let currentPeriodIdx = -1;
+
+    window.onload = () => {
+        updatePeriodSelect();
+        if (periods.length > 0) {
+            currentPeriodIdx = periods.length - 1;
+            document.getElementById('periodSelect').value = currentPeriodIdx;
+            switchPeriod();
+        }
+    };
+
+    function showPage(page) {
+        document.getElementById('pageCalendar').classList.toggle('active', page === 'calendar');
+        document.getElementById('pageHistory').classList.toggle('active', page === 'history');
+        document.getElementById('pageCalc').classList.toggle('active', page === 'calc');
+        
+        document.getElementById('tabCal').classList.toggle('active', page === 'calendar');
+        document.getElementById('tabHis').classList.toggle('active', page === 'history');
+        document.getElementById('tabCalc').classList.toggle('active', page === 'calc');
+
+        if (page === 'history') renderHistory();
+    }
+
+    function updatePeriodSelect() {
+        const select = document.getElementById('periodSelect');
+        select.innerHTML = periods.length ? periods.map((p, i) => `<option value="${i}">${p.name}</option>`).join('') : '<option value="-1">-- 月度を登録してください --</option>';
+    }
+
+    function openPeriodModal(isEdit) {
+        const modal = document.getElementById('periodModal');
+        if (isEdit && currentPeriodIdx !== -1) {
+            const p = periods[currentPeriodIdx];
+            document.getElementById('pStart').value = p.start;
+            document.getElementById('pEnd').value = p.end;
+            document.getElementById('editPeriodIdx').value = currentPeriodIdx;
+        } else {
+            const lastEnd = periods.length ? new Date(periods[periods.length-1].end) : null;
+            if (lastEnd) {
+                lastEnd.setDate(lastEnd.getDate() + 1);
+                document.getElementById('pStart').value = lastEnd.toISOString().split('T')[0];
+            }
+            document.getElementById('pEnd').value = "";
+            document.getElementById('editPeriodIdx').value = -1;
+        }
+        modal.style.display = 'block';
+    }
+
+    function savePeriod() {
+        const start = document.getElementById('pStart').value;
+        const end = document.getElementById('pEnd').value;
+        const idx = parseInt(document.getElementById('editPeriodIdx').value);
+        if (!start || !end) return alert("日付を入力してください");
+        
+        const endDate = new Date(end);
+        const name = `${endDate.getFullYear()}年 ${endDate.getMonth() + 1}月度`;
+        
+        if (idx === -1) {
+            periods.push({ name, start, end });
+            currentPeriodIdx = periods.length - 1;
+        } else {
+            periods[idx] = { name, start, end };
+        }
+        localStorage.setItem('taxi_p_v5', JSON.stringify(periods));
+        updatePeriodSelect();
+        document.getElementById('periodSelect').value = currentPeriodIdx;
+        switchPeriod();
+        closeModal('periodModal');
+    }
+
+    function switchPeriod() {
+        currentPeriodIdx = parseInt(document.getElementById('periodSelect').value);
+        renderCalendar();
+    }
+
+    function calcNet(gross, fixed, ded, add, pick) {
+        let val = (gross + fixed - (ded * 2) + add - (pick * 100)) / 1.1;
+        return Math.round(val / 10) * 10;
+    }
+
+    function getPeriodStats(period) {
+        let total = 0, work = 0;
+        const start = new Date(period.start);
+        const end = new Date(period.end);
+        let curr = new Date(start);
+        while (curr <= end) {
+            const dateStr = curr.toISOString().split('T')[0];
+            const data = dailyData[dateStr];
+            if (data) {
+                total += data.netIncome;
+                work += (data.workType === '日勤' ? 0.5 : 1.0);
+            }
+            curr.setDate(curr.getDate() + 1);
+        }
+        return { total, work, avg: work > 0 ? Math.round(total / work) : 0 };
+    }
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        const period = periods[currentPeriodIdx];
+        if (!period) return;
+        document.getElementById('periodDates').innerText = `${period.start} ～ ${period.end}`;
+        grid.innerHTML = '';
+        ['日','月','火','水','木','金','土'].forEach(h => grid.innerHTML += `<div class="calendar-header">${h}</div>`);
+        const start = new Date(period.start);
+        const end = new Date(period.end);
+        for (let i = 0; i < start.getDay(); i++) grid.innerHTML += '<div></div>';
+        
+        let stats = getPeriodStats(period);
+        let dayDiff = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        
+        let curr = new Date(start);
+        while (curr <= end) {
+            const dateStr = curr.toISOString().split('T')[0];
+            const data = dailyData[dateStr];
+            const cell = document.createElement('div');
+            cell.className = `day-cell ${data ? 'active' : ''}`;
+            let html = `<div class="day-num">${curr.getDate()}</div>`;
+            if (data) {
+                html += `<div class="day-data">${data.workType}</div>`;
+                html += `<div class="day-income">¥${data.netIncome.toLocaleString()}</div>`;
+            }
+            cell.innerHTML = html;
+            cell.onclick = () => openEntryModal(dateStr);
+            grid.appendChild(cell);
+            curr.setDate(curr.getDate() + 1);
+        }
+        document.getElementById('sumTotal').innerText = `¥${stats.total.toLocaleString()}`;
+        document.getElementById('sumWorkCount').innerText = `${stats.work}回`;
+        document.getElementById('sumAvg').innerText = `¥${stats.avg.toLocaleString()}`;
+        document.getElementById('sumMonthType').innerText = dayDiff === 31 ? "大の月" : (dayDiff === 30 ? "小の月" : `${dayDiff}日間`);
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('historyList');
+        list.innerHTML = '';
+        if (!periods.length) {
+            list.innerHTML = '<p style="text-align:center; color:#999;">履歴がありません</p>';
+            return;
+        }
+
+        // 降順（新しい順）で表示
+        [...periods].reverse().forEach(p => {
+            const stats = getPeriodStats(p);
+            const card = document.createElement('div');
+            card.className = 'card history-card';
+            card.innerHTML = `
+                <div class="history-title">${p.name}</div>
+                <div style="font-size:0.65rem; color:#999; margin-bottom:8px;">${p.start} ～ ${p.end}</div>
+                <div class="history-stats">
+                    <div class="history-stat-box"><span class="history-stat-label">総収入</span><span class="history-stat-val" style="color:var(--success)">¥${stats.total.toLocaleString()}</span></div>
+                    <div class="history-stat-box"><span class="history-stat-label">勤務回数</span><span class="history-stat-val">${stats.work}回</span></div>
+                    <div class="history-stat-box"><span class="history-stat-label">平均売上</span><span class="history-stat-val">¥${stats.avg.toLocaleString()}</span></div>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    }
+
+    function openEntryModal(dateStr) {
+        document.getElementById('editDate').value = dateStr;
+        document.getElementById('modalTitle').innerText = dateStr;
+        const data = dailyData[dateStr];
+        const view = document.getElementById('viewDetails');
+        toggleEditMode(!data);
+        if (data) {
+            view.innerHTML = `
+                <div class="summary-item" style="margin-bottom:15px; text-align:center;">
+                    <div class="summary-label">営業収入(税抜)</div>
+                    <div class="summary-val income" style="font-size:1.8rem">¥${data.netIncome.toLocaleString()}</div>
+                </div>
+                <p><b>勤務形態:</b> ${data.workType}</p>
+                <p><b>乗務時間:</b> ${data.startTime} ～ ${data.endTime} ${data.isNextDay ? '<span style="color:var(--warning)">[翌]</span>' : ''}</p>
+                <p><b>ハンドル時間:</b> ${calcHandleTime(data.startTime, data.endTime, data.isNextDay, data.breakTime)}</p>
+                <p><b>営業回数:</b> ${data.trips}回</p>
+            `;
+        }
+        document.getElementById('entryModal').style.display = 'block';
+    }
+
+    function toggleEditMode(isEdit) {
+        document.getElementById('viewMode').classList.toggle('hidden', isEdit);
+        document.getElementById('editMode').classList.toggle('hidden', !isEdit);
+        if (isEdit) {
+            const data = dailyData[document.getElementById('editDate').value] || {};
+            document.getElementById('workType').value = data.workType || '日勤';
+            document.getElementById('startTime').value = data.startTime || '6:00';
+            document.getElementById('endTime').value = data.endTime || '';
+            document.getElementById('isNextDay').checked = data.isNextDay || false;
+            document.getElementById('breakTime').value = data.breakTime || 60;
+            document.getElementById('grossIncome').value = data.grossIncome || 0;
+            document.getElementById('fixedDiff').value = data.fixedDiff || 0;
+            document.getElementById('deduction').value = data.deduction || 0;
+            document.getElementById('advanceAdd').value = data.advanceAdd || 0;
+            document.getElementById('pickupCount').value = data.pickupCount || 0;
+            document.getElementById('trips').value = data.trips || 0;
+        }
+    }
+
+    function saveData() {
+        const dateStr = document.getElementById('editDate').value;
+        const gross = parseFloat(document.getElementById('grossIncome').value) || 0;
+        const fixed = parseFloat(document.getElementById('fixedDiff').value) || 0;
+        const ded = parseFloat(document.getElementById('deduction').value) || 0;
+        const add = parseFloat(document.getElementById('advanceAdd').value) || 0;
+        const pick = parseInt(document.getElementById('pickupCount').value) || 0;
+
+        dailyData[dateStr] = {
+            workType: document.getElementById('workType').value,
+            startTime: document.getElementById('startTime').value,
+            endTime: document.getElementById('endTime').value,
+            isNextDay: document.getElementById('isNextDay').checked,
+            breakTime: document.getElementById('breakTime').value,
+            grossIncome: gross,
+            fixedDiff: fixed,
+            deduction: ded,
+            advanceAdd: add,
+            pickupCount: pick,
+            trips: document.getElementById('trips').value,
+            netIncome: calcNet(gross, fixed, ded, add, pick)
+        };
+        localStorage.setItem('taxi_d_v5', JSON.stringify(dailyData));
+        renderCalendar();
+        closeModal('entryModal');
+    }
+
+    function quickCalc() {
+        const g = parseFloat(document.getElementById('qGross').value) || 0;
+        const p = parseInt(document.getElementById('qPick').value) || 0;
+        const f = parseFloat(document.getElementById('qFixed').value) || 0;
+        const d = parseFloat(document.getElementById('qDed').value) || 0;
+        const a = parseFloat(document.getElementById('qAdd').value) || 0;
+        document.getElementById('qResult').innerText = `¥${calcNet(g, f, d, a, p).toLocaleString()}`;
+    }
+
+    function resetQuickCalc() {
+        ['qGross', 'qPick', 'qFixed', 'qDed', 'qAdd'].forEach(id => document.getElementById(id).value = "");
+        quickCalc();
+    }
+
+    function calcHandleTime(sT, eT, next, bM) {
+        if (!sT || !eT) return "--:--";
+        let s = sT.split(':'), e = eT.split(':');
+        let m = (parseInt(e[0])*60 + parseInt(e[1])) - (parseInt(s[0])*60 + parseInt(s[1])) - parseInt(bM);
+        if (next) m += 1440;
+        return m < 0 ? "0時間0分" : `${Math.floor(m/60)}時間${m%60}分`;
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+</script>
+</body>
+</html>
