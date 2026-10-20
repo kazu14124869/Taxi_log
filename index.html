@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123b5d">
+<title>タクシー営収管理</title>
+<style>
+:root{--navy:#123b5d;--blue:#1769aa;--pale:#eef5fa;--line:#d9e2ea;--text:#1d2935;--muted:#647383;--green:#147d50;--orange:#a85b00;--red:#b42318}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:#f4f7fa;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--navy);color:#fff;padding:18px 16px}
+header h1{margin:0;font-size:1.3rem} header p{margin:5px 0 0;color:#dceaf5;font-size:.88rem}
+main{max-width:1100px;margin:auto;padding:14px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:14px;box-shadow:0 2px 7px #102a430a}
+h2{font-size:1.05rem;margin:0 0 12px}
+.settings,.summary,.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+label{font-size:.87rem;font-weight:650}
+input,select,button{font:inherit}
+input,select{width:100%;padding:10px;border:1px solid #bdc9d4;border-radius:8px;background:#fff;color:var(--text);min-width:0}
+input[readonly]{background:#f0f5f8;color:#29475e;font-weight:700}
+button{border:0;border-radius:9px;padding:10px 13px;background:var(--blue);color:white;font-weight:650;cursor:pointer}
+button.secondary{background:#e8eef4;color:var(--navy)} button.danger{background:#fff0ef;color:var(--red);border:1px solid #f2c5c1}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #9bc8ed;outline-offset:1px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.summary{display:flex;flex-direction:column;flex-wrap:nowrap;gap:8px;padding-bottom:5px}.summary .stat{width:100%;flex:0 0 auto}
+.stat{background:var(--pale);padding:12px;border-radius:10px;min-width:0}
+.stat span{display:block;color:var(--muted);font-size:.78rem}
+.stat strong{display:block;font-size:1.12rem;margin-top:4px;overflow-wrap:anywhere}
+.period-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.period-nav h2{margin:0;text-align:center;flex:1}
+.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.weekday{text-align:center;font-size:.78rem;color:var(--muted);padding:5px 0;font-weight:700}
+.day{min-height:105px;padding:7px 5px;border:1px solid var(--line);background:white;color:var(--text);border-radius:9px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden}
+.day .num{font-size:.84rem;font-weight:800;width:100%;text-align:center}
+.day .sales{display:block;width:100%;font-size:clamp(.42rem,1.8vw,.75rem);font-weight:750;color:var(--green);white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;letter-spacing:-.045em;text-align:center;line-height:1.2}
+.day .meta{font-size:.67rem;color:var(--muted);line-height:1.35}
+.day.selected{outline:2px solid var(--blue);border-color:var(--blue)}
+.day.has-data{background:#f2faf6}
+.day.off{background:#f5f6f7;color:#7b8791}
+.day.outside{visibility:hidden;pointer-events:none}
+.day.today{border:2px solid var(--blue)}
+.note{font-size:.82rem;color:var(--muted);line-height:1.55}
+.result{background:#eaf7f0;border:1px solid #b7e2c9;border-radius:10px;padding:12px;margin-top:12px}
+.result strong{font-size:1.25rem;color:var(--green)}
+.result small{display:block;color:#416553;margin-top:4px}
+#editorTitle{margin-bottom:12px}
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.full{grid-column:1/-1}
+.empty{text-align:center;color:var(--muted);padding:24px 8px}
+footer{text-align:center;color:var(--muted);font-size:.78rem;padding:8px 12px 24px}
+@media(min-width:760px){.settings{grid-template-columns:repeat(4,minmax(0,1fr))}.form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.day{min-height:125px;padding:9px}.day .sales{font-size:.78rem}.day .meta{font-size:.72rem}}
+@media(max-width:420px){main{padding:9px}.panel{padding:11px}.calendar{gap:3px}.day{min-height:87px;padding:5px 3px;border-radius:7px}.day .sales{font-size:clamp(.42rem,1.8vw,.52rem);white-space:nowrap;overflow:visible;text-overflow:clip;letter-spacing:-.055em}.day .meta{font-size:.6rem}.weekday{font-size:.7rem}.summary{gap:8px}.summary .stat{width:100%;padding:10px}.summary .stat strong{font-size:1rem}}
+
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 14px}
+.tab{background:#e4ebf2;color:#29465d;padding:11px 5px;font-size:.83rem;border-radius:10px}
+.tab.active{background:var(--navy);color:#fff;box-shadow:0 2px 6px #102a4326}
+.view-panel[hidden]{display:none!important}
+.mode-switch{display:flex;gap:8px;margin-bottom:12px}.mode-switch button{flex:1}.mode-switch .active{background:var(--navy);color:#fff}.mode-note{margin:0 0 12px}
+.day.status-work{background:#eaf7ee;border-color:#98d4ad}
+.day.status-public-day{background:#fff0d9;border-color:#e9bd76}
+.day.status-public-alt{background:#ffe6d9;border-color:#e8a17e}
+.day.status-ake{background:#e5f1ff;border-color:#a6c9f0}
+.day.status-holiday{background:#fff0f0;border-color:#e8a0a0;color:#b42323}
+.day.status-paid{background:#fff0f0;border-color:#e8a0a0;color:#b42323}
+.day.status-empty{background:#fff}
+.day .status-chip{font-size:.62rem;font-weight:800;border-radius:4px;padding:2px 3px;align-self:flex-start;background:#ffffffb8;color:#34495a}
+@media(max-width:420px){.tab{font-size:.72rem;padding:10px 2px}.tabs{gap:4px}}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>🚕 タクシー営収管理</h1>
+</header>
+<main>
+  <nav class="tabs" aria-label="画面切り替え">
+    <button type="button" class="tab" data-view="settings">締め日設定</button>
+    <button type="button" class="tab" data-view="summary">月度合計</button>
+    <button type="button" class="tab active" data-view="calendar">カレンダー</button>
+    <button type="button" class="tab" data-view="entry">記入欄</button>
+  </nav>
+  <section class="panel view-panel" data-panel="settings">
+    <h2>締め日設定</h2>
+    <div class="settings">
+      <div class="field"><label for="degreeMonth">月度</label><select id="degreeMonth"><option value="1">1月度</option><option value="2">2月度</option><option value="3">3月度</option><option value="4">4月度</option><option value="5">5月度</option><option value="6">6月度</option><option value="7">7月度</option><option value="8">8月度</option><option value="9">9月度</option><option value="10">10月度</option><option value="11">11月度</option><option value="12">12月度</option></select></div>
+      <div class="field"><label for="periodStart">月初め（起算日）</label><input id="periodStart" type="date"></div>
+      <div class="field"><label for="periodEnd">締め日</label><input id="periodEnd" type="date"></div>
+      <div class="field"><label for="taxRate">消費税率（%）</label><input id="taxRate" type="number" min="0" max="100" step="0.1" value="10"></div>
+      <div class="field"><label for="pickupFee">迎車1回の控除額（円）</label><input id="pickupFee" type="number" min="0" step="1" value="100"></div>
+    </div>
+    <div class="actions">
+      <button id="applyPeriod">期間を適用</button>
+      <button class="secondary" id="thisPeriod">今月を表示</button>
+    </div>
+  </section>
+
+  <section class="panel view-panel" data-panel="summary">
+    <div class="period-nav">
+      <button class="secondary" id="prevPeriod" aria-label="前の期間">← 前へ</button>
+      <h2 id="periodLabel">対象期間</h2>
+      <button class="secondary" id="nextPeriod" aria-label="次の期間">次へ →</button>
+    </div>
+    <div class="summary">
+      <div class="stat"><span>営収合計</span><strong id="totalSales">¥0</strong></div>
+      <div class="stat"><span>勤務換算</span><strong id="workDays">0.0勤務</strong></div>
+      <div class="stat"><span>売上平均（勤務換算）</span><strong id="salesAverage">¥0</strong></div>
+      <div class="stat"><span>拘束時間合計 / 上限</span><strong id="bindingTotal">0時間00分 / 262時間</strong></div>
+      <div class="stat"><span>拘束時間の残り</span><strong id="bindingRemaining">262時間00分</strong></div>
+      <div class="stat"><span>残業時間合計</span><strong id="overtimeTotal">0時間00分</strong></div>
+    </div>
+  </section>
+
+  <section class="panel view-panel" data-panel="calendar">
+    <div id="calendar" class="calendar" aria-label="売上カレンダー"></div>
+    <div id="dayDetails" class="result" style="background:#f8fbfd;border-color:var(--line);color:var(--text)"><strong style="font-size:1rem;color:var(--navy)">日付を選択してください</strong></div>
+  </section>
+
+  <section class="panel view-panel" data-panel="entry" id="editor">
+    <h2 id="editorTitle">日別データを入力</h2>
+    <div class="form-grid">
+      <div class="field"><label for="entryMode">記録モード</label><select id="entryMode"><option value="normal">通常モード（営収などを記録）</option><option value="shift">勤務記録モード（勤務形態のみ）</option></select></div>
+      <div class="field"><label for="entryDate">日付</label><input id="entryDate" type="date"></div>
+      <div class="field"><label for="shiftType">勤務形態</label><select id="shiftType"><option value="日勤">日勤</option><option value="隔勤">隔勤</option><option value="公出（日勤）">公出（日勤）</option><option value="公出（隔勤）">公出（隔勤）</option><option value="公休">公休</option><option value="有給">有給</option><option value="明け" hidden>明け（自動）</option></select></div>
+      <div class="field"><label for="rollCall">点呼時間</label><select id="rollCall"><option value="">選択してください</option><option value="05:30">5:30</option><option value="06:00">6:00</option><option value="06:30">6:30</option><option value="07:00">7:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="17:30">17:30</option></select></div>
+      <div class="field"><label for="returnTime">帰庫時間</label><input id="returnTime" type="time"></div>
+      <div class="field"><label>休憩時間</label><div style="display:flex;align-items:center;gap:6px"><input id="breakHours" type="number" min="0" step="1" value="0" aria-label="休憩時間（時間）" style="min-width:0;flex:1"><span style="white-space:nowrap">時間</span><input id="breakMins" type="number" min="0" max="59" step="1" value="0" aria-label="休憩時間（分）" style="min-width:0;flex:1"><span style="white-space:nowrap">分</span></div></div>
+      <div class="field"><label>拘束時間</label><input id="bindingTime" readonly value="0時間00分"></div>
+      <div class="field"><label>ハンドル時間</label><input id="handleTime" readonly value="0時間00分"></div>
+      <div class="field"><label>規定ハンドル時間</label><input id="standardHandle" readonly value="7時間07分"></div>
+      <div class="field"><label>当日の残業時間</label><input id="overtime" readonly value="0時間00分"></div>
+      <div class="field"><label for="gross">税込営収（円）</label><input id="gross" type="number" min="0" step="1" placeholder="例：50000"></div>
+      <div class="field"><label for="pickups">迎車回数（回）</label><input id="pickups" type="number" min="0" step="1" value="0"></div>
+      <div class="field"><label for="disability">障害割引（円）</label><input id="disability" type="number" min="0" step="1" value="0"></div>
+      <div class="field"><label for="flatDiff">定額差額（円）</label><input id="flatDiff" type="number" min="0" step="1" value="0"></div>
+      <div class="field"><label for="advanceDiff">事前確定差額（円）</label><input id="advanceDiff" type="number" step="1" value="0"></div>
+      <div class="field"><label for="otherDeduction">その他控除額（円）</label><input id="otherDeduction" type="number" step="1" value="0"></div>
+      <div class="field"><label for="km">営業キロ（km）</label><input id="km" type="number" min="0" step="0.1" placeholder="例：180.5"></div>
+      <div class="field"><label for="trips">営業回数（回）</label><input id="trips" type="number" min="0" step="1" placeholder="例：35"></div>
+    </div>
+    <div class="result">
+      <div>計算後の税抜営収</div>
+      <strong id="calculatedSales">¥0</strong>
+      <small id="calculationDetail" hidden></small>
+    </div>
+    <div class="actions">
+      <button id="saveEntry">この日の記録を保存</button>
+      <button class="secondary" id="clearForm">入力をリセット</button>
+      <button class="danger" id="deleteEntry">この日の記録を削除</button>
+    </div>
+    <div class="panel" style="margin-top:16px;background:#f8fbfd">
+      <h2>売上計算専用（記録に保存しない）</h2>
+      <div class="form-grid">
+        <div class="field"><label for="calcGross">税込営収（円）</label><input id="calcGross" type="number" min="0" step="1" placeholder="例：50000" value="0"></div>
+        <div class="field"><label for="calcPickups">迎車回数（回）</label><input id="calcPickups" type="number" min="0" step="1" value="0"></div>
+        <div class="field"><label for="calcDisability">障害割引（円）</label><input id="calcDisability" type="number" min="0" step="1" value="0"></div>
+        <div class="field"><label for="calcFlatDiff">定額差額（円）</label><input id="calcFlatDiff" type="number" step="1" value="0"></div>
+        <div class="field"><label for="calcAdvanceDiff">事前確定差額（円）</label><input id="calcAdvanceDiff" type="number" step="1" value="0"></div>
+        <div class="field"><label for="calcOtherDeduction">その他控除額（円）</label><input id="calcOtherDeduction" type="number" step="1" value="0"></div>
+      </div>
+      <div class="result">
+        <div>計算後の税抜営収（計算専用）</div>
+        <strong id="standaloneSales">¥0</strong>
+        <small id="standaloneDetail" hidden></small>
+      </div>
+      <div class="actions"><button type="button" class="secondary" id="clearStandalone">計算欄をクリア</button></div>
+    </div>
+  </section>
+
+</main>
+<footer>タクシー営収管理</footer>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const STORAGE_KEY = "taxiRevenueManager_v1";
+  const fields = ["shiftType","rollCall","returnTime","breakMinutes","gross","pickups","disability","flatDiff","advanceDiff","otherDeduction","km","trips"];
+  const yen = n => "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP");
+  const num = id => {
+    const v = Number($(id).value);
+    return Number.isFinite(v) ? v : 0;
+  };
+  const pad = n => String(n).padStart(2,"0");
+  const dateString = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const parseDate = s => {
+    const [y,m,d] = s.split("-").map(Number);
+    return new Date(y,m-1,d,12,0,0,0);
+  };
+  const addDays = (s, n) => { const d=parseDate(s); d.setDate(d.getDate()+n); return dateString(d); };
+  const addMonthsClamped = (s, months) => {
+    const d=parseDate(s), day=d.getDate();
+    d.setDate(1); d.setMonth(d.getMonth()+months);
+    const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+    d.setDate(Math.min(day,last));
+    return dateString(d);
+  };
+  const dayDiff = (a,b) => Math.round((parseDate(b)-parseDate(a))/86400000);
+  const readStore = () => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {records:{},settings:{}}; }
+    catch { return {records:{},settings:{}}; }
+  };
+  let store = readStore();
+  if (!store.records || typeof store.records !== "object") store.records = {};
+  if (!store.settings || typeof store.settings !== "object") store.settings = {};
+  if (!store.shiftRecords || typeof store.shiftRecords !== "object") store.shiftRecords = {};
+  let entryMode = store.settings.entryMode === "shift" ? "shift" : "normal";
+  const saveStore = () => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); return true; }
+    catch { alert("端末内に保存できませんでした。ブラウザの空き容量やプライベートモードを確認してください。"); return false; }
+  };
+
+  const today = dateString(new Date());
+  const savedStart = store.settings.start;
+  const savedEnd = store.settings.end;
+  if (savedStart && savedEnd && savedStart <= savedEnd) {
+    let s=savedStart, e=savedEnd;
+    const length=dayDiff(s,e)+1;
+    // 起動時の初期表示は、保存時に別月度を選んでいても「今日を含む期間」に戻す。
+    while (today < s) { e=addDays(s,-1); s=addDays(e,-(length-1)); }
+    while (today > e) { s=addDays(e,1); e=addDays(s,length-1); }
+    $("periodStart").value=s; $("periodEnd").value=e;
+  } else {
+    const d=parseDate(today);
+    $("periodStart").value=dateString(new Date(d.getFullYear(),d.getMonth(),1,12));
+    $("periodEnd").value=today;
+  }
+  // 月度ラベルの初期値は、設定欄で最後に選んだ値ではなく、今日を含む期間の締め月に合わせる。
+  $("degreeMonth").value = Number($("periodEnd").value.slice(5,7));
+  $("taxRate").value = store.settings.taxRate ?? 10;
+  $("pickupFee").value = store.settings.pickupFee ?? 100;
+  let start=$("periodStart").value, end=$("periodEnd").value, selected=today;
+  if (selected < start || selected > end) selected=end;
+
+  const minutesText = minutes => {
+    const m=Math.max(0,Math.round(minutes||0));
+    return `${Math.floor(m/60)}時間${pad(m%60)}分`;
+  };
+  function shiftMinutes(record) {
+    if(!record.rollCall || !record.returnTime) return {binding:0,handle:0};
+    const [sh,sm]=record.rollCall.split(":").map(Number);
+    const [eh,em]=record.returnTime.split(":").map(Number);
+    let begin=sh*60+sm, finish=eh*60+em;
+    if(finish<begin) finish+=1440;
+    const binding=finish-begin;
+    return {binding,handle:Math.max(0,binding-(Number(record.breakMinutes)||0))};
+  }
+  function kind(record) {
+    // 旧版データの勤務区分を優先して新しい勤務形態へ変換
+    if(record.shiftStatus==="公休") return "公休";
+    if(record.shiftStatus==="明け") return "明け";
+    if(record.shiftStatus==="公出（日）") return "公出（日勤）";
+    if(record.shiftStatus==="公出（隔）") return "公出（隔勤）";
+    if(record.shiftStatus==="勤務" && record.shiftType==="隔日勤務") return "隔勤";
+    if(record.shiftStatus==="勤務" && record.shiftType==="日勤") return "日勤";
+    if(record.shiftType==="隔日勤務") return "隔勤";
+    if(record.shiftType && ["日勤","隔勤","公出（日勤）","公出（隔勤）","公休","有給","明け"].includes(record.shiftType)) return record.shiftType;
+    return "日勤";
+  }
+  function isPublic(record) {
+    const k=kind(record);
+    return k==="公出（日勤）" || k==="公出（隔勤）";
+  }
+  function overtimeMinutes(record) {
+    const k=kind(record), handle=shiftMinutes(record).handle;
+    if(isPublic(record)) return handle;
+    if(k!=="日勤" && k!=="隔勤") return 0;
+    const standard=k==="隔勤"?855:427;
+    return Math.max(0,handle-standard);
+  }
+  function calc(record) {
+    const rate=Math.max(0,Number($("taxRate").value)||0)/100;
+    const fee=Math.max(0,Number($("pickupFee").value)||0);
+    const adjusted=(Number(record.gross)||0)-(Number(record.pickups)||0)*fee
+      -(Number(record.disability)||0)-(Number(record.flatDiff)||0)+(Number(record.advanceDiff)||0)-(Number(record.otherDeduction)||0);
+    return Math.round((adjusted/(1+rate))/10)*10;
+  }
+  function persistSettings() {
+    store.settings={start:$("periodStart").value,end:$("periodEnd").value,
+      degreeMonth:Number($("degreeMonth").value)||parseDate($("periodEnd").value).getMonth()+1,
+      entryMode, taxRate:Number($("taxRate").value)||0,pickupFee:Number($("pickupFee").value)||0};
+    saveStore();
+  }
+  function applyPeriod() {
+    const s=$("periodStart").value, e=$("periodEnd").value;
+    if (!s || !e) { alert("月初めと締め日を入力してください。"); return; }
+    if (s>e) { alert("月初めは締め日以前の日付にしてください。"); return; }
+    start=s; end=e; selected=(selected>=start&&selected<=end)?selected:end;
+    // 期間を適用した時点で、月度・起算日・締め日・計算設定をまとめて保存する。
+    persistSettings();
+    if (!saveStore()) return;
+    render();
+  }
+  function renderSummary() {
+    let sales=0,work=0,binding=0,overtime=0;
+    const days=dayDiff(start,end)+1;
+    const limit=(days===31?270:262)*60;
+    for(let d=start;d<=end;d=addDays(d,1)){
+      const r=store.records[d];if(!r)continue;
+      const k=kind(r);
+      if(k!=="公休" && k!=="有給" && k!=="明け"){sales+=calc(r);}
+      if(k==="日勤" || k==="公出（日勤）") work += 0.5;
+      else if(k==="隔勤" || k==="公出（隔勤）") work += 1;
+      const t=shiftMinutes(r);binding+=t.binding;overtime+=overtimeMinutes(r);
+    }
+    $("totalSales").textContent=yen(sales);
+    $("workDays").textContent=work.toFixed(1)+"勤務";$("salesAverage").textContent=work>0?yen(sales/work):"—";
+    $("bindingTotal").textContent=`${minutesText(binding)} / ${days===31?270:262}時間`;
+    const left=limit-binding;
+    $("bindingRemaining").textContent=left>=0?minutesText(left):"超過 "+minutesText(-left);
+    $("bindingRemaining").style.color=left<0?"var(--red)":"";
+    $("overtimeTotal").textContent=minutesText(overtime);
+  }
+    function renderCalendar() {
+    const cal=$("calendar"); cal.innerHTML="";
+    ["日","月","火","水","木","金","土"].forEach(w=>{
+      const el=document.createElement("div"); el.className="weekday"; el.textContent=w; cal.appendChild(el);
+    });
+    const first=parseDate(start), offset=first.getDay();
+    for(let i=0;i<offset;i++){const blank=document.createElement("div");blank.className="day outside";cal.appendChild(blank);}
+    for(let d=start;d<=end;d=addDays(d,1)){
+      const date=parseDate(d), r=store.shiftRecords[d] || store.records[d];
+      const displayMode=store.shiftRecords[d] ? "shift" : "normal";
+      const btn=document.createElement("button");
+      btn.type="button"; btn.className="day";
+      if(d===selected)btn.classList.add("selected");
+      if(r)btn.classList.add("has-data");
+      if(d===today)btn.classList.add("today");
+      const k=r?kind(r):"";
+      if(k==="日勤" || k==="隔勤")btn.classList.add("status-work");
+      else if(k==="公出（日勤）")btn.classList.add("status-public-day");
+      else if(k==="公出（隔勤）")btn.classList.add("status-public-alt");
+      else if(k==="公休")btn.classList.add("status-holiday");
+      else if(k==="有給")btn.classList.add("status-paid");
+      else if(k==="明け")btn.classList.add("status-ake");
+      else btn.classList.add("status-empty");
+      const n=document.createElement("span");n.className="num";n.textContent=date.getDate();btn.appendChild(n);
+      if(r){
+        const chip=document.createElement("span");chip.className="status-chip";chip.textContent=isPublic(r)?"公出":k;btn.appendChild(chip);
+        if(displayMode!=="shift" && k!=="公休" && k!=="有給" && k!=="明け"){
+          const sales=document.createElement("span");sales.className="sales";sales.textContent=yen(calc(r));btn.appendChild(sales);
+          const m=document.createElement("span");m.className="meta";
+          m.textContent=(Number(r.trips)>0?r.trips+"回":"");
+          if(m.textContent)btn.appendChild(m);
+        }
+      }
+      btn.addEventListener("click",()=>{selected=d;renderCalendar();renderDayDetails(d);});
+      cal.appendChild(btn);
+    }
+    const degreeMonth=Number($("degreeMonth").value)||parseDate(end).getMonth()+1;
+    $("periodLabel").textContent=`${degreeMonth}月度　${start.replaceAll("-","/")} ～ ${end.replaceAll("-","/")}`;
+
+  }
+  function renderDayDetails(d){
+    const box=$("dayDetails"); if(!box)return; box.innerHTML="";
+    const title=document.createElement("strong"); title.style.cssText="font-size:1rem;color:var(--navy)";
+    const selectedDate=parseDate(d);
+    title.textContent=`${selectedDate.getFullYear()}年${selectedDate.getMonth()+1}月${selectedDate.getDate()}日（${["日","月","火","水","木","金","土"][selectedDate.getDay()]}）`;
+    box.appendChild(title);
+    const r=store.shiftRecords[d] || store.records[d], displayMode=store.shiftRecords[d] ? "shift" : "normal", content=document.createElement("div"); content.style.cssText="margin-top:8px;line-height:1.65;white-space:pre-line";
+    if(!r){content.textContent="この日は未入力です。";box.appendChild(content);}
+    else {
+      const k=kind(r), lines=[`勤務形態：${k}`];
+      if(displayMode!=="shift" && k!=="公休"&&k!=="有給"&&k!=="明け") lines.push(`営収：${yen(calc(r))}`,`点呼：${r.rollCall||"未入力"}`,`帰庫：${r.returnTime||"未入力"}`,`休憩：${minutesText(r.breakMinutes||0)}`,`拘束時間：${minutesText(shiftMinutes(r).binding)}`,`ハンドル時間：${minutesText(shiftMinutes(r).handle)}`,`残業時間：${minutesText(overtimeMinutes(r))}`,`営業キロ：${r.km||0} km`,`営業回数：${r.trips||0}回`);
+      content.textContent=lines.join("\n");box.appendChild(content);
+    }
+    const actions=document.createElement("div");actions.className="actions";
+    const edit=document.createElement("button");edit.type="button";edit.textContent=r?"編集する":"入力する";edit.addEventListener("click",()=>{loadEntry(d);showView("entry");});actions.appendChild(edit);
+    if(r){const del=document.createElement("button");del.type="button";del.className="danger";del.textContent="削除する";del.addEventListener("click",()=>{if(confirm(`${d} の${displayMode==="shift"?"勤務記録":"記録"}を削除しますか？`)){const records=displayMode==="shift"?store.shiftRecords:store.records;delete records[d];if(saveStore()){render();renderDayDetails(d);loadEntry(d);}}});actions.appendChild(del);}
+    box.appendChild(actions);
+  }
+  function render(){renderCalendar();renderSummary();updateCalculation();renderDayDetails(selected);}
+
+  function loadEntry(d) {
+    selected=d; $("entryDate").value=d;
+    entryMode = store.shiftRecords[d] ? "shift" : "normal";
+    $("entryMode").value=entryMode;
+    const r=(entryMode==="shift" ? store.shiftRecords[d] : store.records[d])||{};
+    let k=kind(r);
+    $("shiftType").value=k;
+    $("rollCall").value=r.rollCall||"";
+    $("returnTime").value=r.returnTime||"";
+    $("breakHours").value=Math.floor((Number(r.breakMinutes)||0)/60); $("breakMins").value=(Number(r.breakMinutes)||0)%60;
+    $("gross").value=r.gross??"";
+    $("pickups").value=r.pickups??0;
+    $("disability").value=r.disability??0;
+    $("flatDiff").value=r.flatDiff??0;
+    $("advanceDiff").value=r.advanceDiff??0;
+    $("otherDeduction").value=r.otherDeduction??0;
+    $("km").value=r.km??"";
+    $("trips").value=r.trips??"";
+    $("editorTitle").textContent=d+" の記録";
+    const hasRecord=entryMode==="shift" ? !!store.shiftRecords[d] : !!store.records[d];
+    $("deleteEntry").disabled=!hasRecord;
+    $("deleteEntry").style.opacity=hasRecord?"1":".5";
+    updateEntryVisibility();
+    updateCalculation();
+    updateWorkTimes();
+  }
+  function updateEntryVisibility(){
+    const k=$("shiftType").value, isDayOff=(k==="公休"||k==="有給"), shiftOnly=entryMode==="shift";
+    document.querySelectorAll("#editor .form-grid > .field").forEach(el=>{
+      el.hidden = shiftOnly ? !el.querySelector("#entryMode, #entryDate, #shiftType") : (isDayOff && !el.querySelector("#entryMode, #entryDate, #shiftType"));
+    });
+    document.querySelectorAll("#editor > .result").forEach(el=>el.hidden=shiftOnly||isDayOff);
+    document.querySelectorAll("#editor > .actions").forEach(el=>el.hidden=false);
+    const calcBox=document.querySelector("#editor .panel");
+    if(calcBox) calcBox.hidden=shiftOnly||isDayOff;
+    const note=document.querySelector("#editor > .note"); if(note) note.hidden=shiftOnly;
+    $("editorTitle").textContent=shiftOnly?$("entryDate").value+" の勤務記録":$("entryDate").value+" の記録";
+    $("saveEntry").textContent=shiftOnly?"勤務形態を保存":"この日の記録を保存";
+    $("clearForm").hidden=shiftOnly;
+  }
+  function updateWorkTimes(){
+    const k=$("shiftType").value;
+    const r={rollCall:$("rollCall").value,returnTime:$("returnTime").value,breakMinutes:Math.max(0,num("breakHours"))*60+Math.min(59,Math.max(0,num("breakMins"))),shiftType:k};
+    const t=shiftMinutes(r),standard=(k==="隔勤"||k==="公出（隔勤）")?855:427;
+    $("bindingTime").value=minutesText(t.binding);
+    $("handleTime").value=minutesText(t.handle);
+    $("standardHandle").value=minutesText(standard);
+    $("overtime").value=minutesText(overtimeMinutes(r));
+  }
+  function updateCalculation(){
+    const r={gross:num("gross"),pickups:num("pickups"),disability:num("disability"),flatDiff:num("flatDiff"),advanceDiff:num("advanceDiff"),otherDeduction:num("otherDeduction")};
+    $("calculatedSales").textContent=yen(calc(r));
+    const fee=Math.max(0,num("pickupFee")), rate=Math.max(0,num("taxRate"));
+    $("calculationDetail").textContent=`（${yen(r.gross)} − ${r.pickups}回×${yen(fee)} − ${yen(r.disability)} − ${yen(r.flatDiff)} ＋ ${yen(r.advanceDiff)} − ${yen(r.otherDeduction)}）÷ ${(1+rate/100).toFixed(3)}。10円単位に四捨五入`;
+  }
+  function updateStandaloneCalculation(){
+    const r={gross:num("calcGross"),pickups:num("calcPickups"),disability:num("calcDisability"),flatDiff:num("calcFlatDiff"),advanceDiff:num("calcAdvanceDiff"),otherDeduction:num("calcOtherDeduction")};
+    $("standaloneSales").textContent=yen(calc(r));
+    const fee=Math.max(0,num("pickupFee")), rate=Math.max(0,num("taxRate"));
+    $("standaloneDetail").textContent=`（${yen(r.gross)} − ${r.pickups}回×${yen(fee)} − ${yen(r.disability)} − ${yen(r.flatDiff)} ＋ ${yen(r.advanceDiff)} − ${yen(r.otherDeduction)}）÷ ${(1+rate/100).toFixed(3)}。10円単位に四捨五入`;
+  }
+  function saveEntry(){
+    const d=$("entryDate").value;
+    if(!d){alert("日付を選んでください。");return;}
+    if(d<start||d>end){if(!confirm("選んだ日付は現在の表示期間外です。記録を保存しますか？"))return;}
+    if(entryMode==="shift"){
+      const shiftType=$("shiftType").value;
+      // 通常モードから勤務記録モードへ切り替えて保存した場合、同日の古い通常記録を残さない。
+      delete store.records[d];
+      store.shiftRecords[d]={shiftType}; selected=d;
+      if(shiftType==="隔勤" || shiftType==="公出（隔勤）"){const next=addDays(d,1);store.shiftRecords[next]={shiftType:"明け"};}
+      if(saveStore()){persistSettings();render();loadEntry(d);renderDayDetails(d);alert("勤務形態を保存しました！");}
+      return;
+    }
+    const r={};
+    fields.forEach(f=>{
+      if(f==="breakMinutes"){r.breakMinutes=Math.max(0,num("breakHours"))*60+Math.min(59,Math.max(0,num("breakMins")));return;}
+      const el=$(f);
+      r[f]=(el.tagName==="SELECT" || el.type==="time")?el.value:(el.value===""?0:Number(el.value));
+    });
+    if(r.shiftType==="公休" || r.shiftType==="有給"){
+      // 休日・有給は日付と勤務形態だけを記録し、勤務・売上項目は保存しない
+      r.rollCall="";r.returnTime="";r.breakMinutes=0;r.gross=0;r.pickups=0;r.disability=0;r.flatDiff=0;r.advanceDiff=0;r.otherDeduction=0;r.km=0;r.trips=0;
+    }
+    if(!Number.isFinite(r.gross)||!Number.isFinite(r.pickups)){alert("数値欄を確認してください。");return;}
+    // 勤務記録モードから通常モードへ切り替えて保存した場合、同日の古い勤務記録を削除する。
+    delete store.shiftRecords[d];
+    store.records[d]=r; selected=d;
+    // 隔勤・公出（隔勤）は翌日を明けとして自動登録。選択肢には出さず、内部状態のみ。
+    if(r.shiftType==="隔勤" || r.shiftType==="公出（隔勤）"){
+      const next=addDays(d,1);
+      if(!store.records[next]) store.records[next]={shiftType:"明け",rollCall:"",returnTime:"",breakMinutes:0,gross:0,pickups:0,disability:0,flatDiff:0,advanceDiff:0,otherDeduction:0,km:0,trips:0};
+      else {store.records[next].shiftType="明け";store.records[next].shiftStatus=undefined;}
+      if(store.shiftRecords[next]) store.shiftRecords[next]={shiftType:"明け"};
+    }
+    if(saveStore()){persistSettings();render();loadEntry(d);renderDayDetails(d);alert("記録を保存しました！");}
+  }
+  $("degreeMonth").addEventListener("change",()=>{});
+  $("applyPeriod").addEventListener("click",applyPeriod);
+  $("thisPeriod").addEventListener("click",()=>{
+    const d=parseDate(today); $("periodStart").value=dateString(new Date(d.getFullYear(),d.getMonth(),1,12));
+    $("periodEnd").value=today; applyPeriod();
+  });
+  $("prevPeriod").addEventListener("click",()=>{
+    const length=dayDiff(start,end)+1;
+    end=addDays(start,-1); start=addDays(end,-(length-1));
+    const degreeMonth=Number($("degreeMonth").value)||parseDate(end).getMonth()+1;
+    $("degreeMonth").value=degreeMonth===1?12:degreeMonth-1;
+    $("periodStart").value=start;$("periodEnd").value=end;selected=end;persistSettings();render();loadEntry(selected);
+  });
+  $("nextPeriod").addEventListener("click",()=>{
+    const length=dayDiff(start,end)+1;
+    start=addDays(end,1);end=addDays(start,length-1);
+    const degreeMonth=Number($("degreeMonth").value)||parseDate(start).getMonth()+1;
+    $("degreeMonth").value=degreeMonth===12?1:degreeMonth+1;
+    $("periodStart").value=start;$("periodEnd").value=end;selected=start;persistSettings();render();loadEntry(selected);
+  });
+  $("entryDate").addEventListener("change",()=>{if($("entryDate").value){loadEntry($("entryDate").value);renderDayDetails($("entryDate").value);}});
+  ["gross","pickups","disability","flatDiff","advanceDiff","otherDeduction","taxRate","pickupFee","rollCall","returnTime","breakHours","breakMins","shiftType","km","trips"].forEach(id=>$(id).addEventListener("input",()=>{updateCalculation();updateWorkTimes();renderCalendar();renderSummary();if(id==="taxRate"||id==="pickupFee")updateStandaloneCalculation();}));
+  $("shiftType").addEventListener("change",()=>{updateEntryVisibility();updateWorkTimes();renderCalendar();renderSummary();});
+  ["calcGross","calcPickups","calcDisability","calcFlatDiff","calcAdvanceDiff","calcOtherDeduction"].forEach(id=>$(id).addEventListener("input",updateStandaloneCalculation));
+  $("clearStandalone").addEventListener("click",()=>{["calcGross","calcPickups","calcDisability","calcFlatDiff","calcAdvanceDiff","calcOtherDeduction"].forEach(id=>$(id).value=0);updateStandaloneCalculation();});
+  $("saveEntry").addEventListener("click",saveEntry);
+  $("clearForm").addEventListener("click",()=>loadEntry($("entryDate").value||selected));
+  $("deleteEntry").addEventListener("click",()=>{
+    const d=$("entryDate").value;
+    const records=entryMode==="shift" ? store.shiftRecords : store.records;
+    if(records[d]&&confirm(d+(entryMode==="shift"?" の勤務記録":" の記録")+"を削除しますか？")){
+      delete records[d];saveStore();render();renderDayDetails(d);loadEntry(d);
+    }
+  });
+  $("entryMode").addEventListener("change",()=>{entryMode=$("entryMode").value;persistSettings();updateEntryVisibility();updateCalculation();updateWorkTimes();});
+  ["taxRate","pickupFee"].forEach(id=>$(id).addEventListener("change",()=>{persistSettings();render();}));
+
+  // 4つの画面を切り替え。初期表示はカレンダー。
+  function showView(view){
+    document.querySelectorAll(".view-panel").forEach(panel=>{
+      panel.hidden = panel.dataset.panel !== view;
+    });
+    document.querySelectorAll(".tab").forEach(tab=>{
+      const active=tab.dataset.view===view;
+      tab.classList.toggle("active",active);
+      tab.setAttribute("aria-current",active?"page":"false");
+    });
+  }
+  document.querySelectorAll(".tab").forEach(tab=>{
+    tab.addEventListener("click",()=>showView(tab.dataset.view));
+  });
+  showView("calendar");
+
+  $("entryMode").value=entryMode;
+  loadEntry(selected); render(); renderDayDetails(selected); updateStandaloneCalculation();
+})();
+</script>
+</body>
+</html>
